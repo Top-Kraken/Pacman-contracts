@@ -13,14 +13,15 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 contract Pacman is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
-    address public coinboxAddress;
-
     uint256 public pricePerRoundInGame = 1 ether;
 
     uint256 public coinboxFee = 20;
     uint256 public rewardFee = 50;
+    uint256 public bonusFee = 75;
 
     uint256 public maxScore = 0;
+
+    bool public bonusDay = false;
 
     IGameToken public gameToken;
 
@@ -31,23 +32,22 @@ contract Pacman is ReentrancyGuard, Ownable {
     }
 
     event NewHighScore(address indexed claimer, uint256 amount, uint256 score);
-    event NewCoinBoxAddress(address _coinboxAddress);
-    event NewCoinBoxFeeAndRewardFee(uint256 _coinboxFee, uint256 _rewardFee);
+    event NewCoinBoxFeeAndRewardFeeAndBonusFee(uint256 _coinboxFee, uint256 _rewardFee, uint256 _bonusFee);
     event EnterGame(address indexed user);
 
     /**
      * @notice Constructor
      * @dev GameToken must be deployed prior to this contract
      * @param _gameTokenAddress: address of the GAME token
-     * @param _coinboxAddress: address of a coinbox
      * @param _coinboxFee: fee that goes into a coinbox
      * @param _rewardFee: fee of the rewards when make a new high score
+     * @param _bonusFee: fee of the bonus rewards when make a new high score in bonus day
      */
-    constructor(address _gameTokenAddress, address _coinboxAddress, uint256 _coinboxFee, uint256 _rewardFee) {
+    constructor(address _gameTokenAddress, uint256 _coinboxFee, uint256 _rewardFee, uint256 _bonusFee) {
         gameToken = IGameToken(_gameTokenAddress);
-        coinboxAddress = _coinboxAddress;
         coinboxFee = _coinboxFee;
         rewardFee = _rewardFee;
+        bonusFee = _bonusFee;
     }
 
     /**
@@ -63,28 +63,13 @@ contract Pacman is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @notice Set coinbox address
-     * @dev Only callable by owner
-     * @param _coinboxAddress: address of a coinbox
-     */
-    function setCoinBoxAddress(address _coinboxAddress)
-        external
-        onlyOwner
-    {
-        require(_coinboxAddress != address(0), "Cannot be zero address");
-
-        coinboxAddress = _coinboxAddress;
-
-        emit NewCoinBoxAddress(_coinboxAddress);
-    }
-
-    /**
      * @notice Set coinbox fee and reward fee
      * @dev Only callable by owner
      * @param _coinboxFee: fee that goes into a coinbox
      * @param _rewardFee: fee of the rewards when make a new high score
+     * @param _bonusFee: fee of the bonus rewards when make a new high score in bonus day
      */
-    function setCoinBoxFeeAndRewardFee(uint256 _coinboxFee, uint256 _rewardFee)
+    function setCoinBoxFeeAndRewardFeeAndBonusFee(uint256 _coinboxFee, uint256 _rewardFee, uint256 _bonusFee)
         external
         onlyOwner
     {
@@ -92,11 +77,14 @@ contract Pacman is ReentrancyGuard, Ownable {
         require(_coinboxFee < 100, "CoinBox Fee must be < 100");
         require(_rewardFee > 0, "Reward Fee must be > 0");
         require(_rewardFee < 100, "Reward Fee must be < 100");
+        require(_bonusFee > 0, "Reward Fee must be > 0");
+        require(_bonusFee < 100, "Reward Fee must be < 100");
 
         coinboxFee = _coinboxFee;
         rewardFee = _rewardFee;
+        bonusFee = _bonusFee;
 
-        emit NewCoinBoxFeeAndRewardFee(_coinboxFee, _rewardFee);
+        emit NewCoinBoxFeeAndRewardFeeAndBonusFee(_coinboxFee, _rewardFee, _bonusFee);
     }
 
     /**
@@ -117,7 +105,7 @@ contract Pacman is ReentrancyGuard, Ownable {
         // Burn some GAME tokens 
         gameToken.burn(address(msg.sender), amountToBurn);
         // Transfer some GAME tokens to coinbox address
-        gameToken.transferFrom(address(msg.sender), coinboxAddress, amountToCoinBox);
+        gameToken.transferFrom(address(msg.sender), address(this), amountToCoinBox);
 
         emit EnterGame(msg.sender);
     }
@@ -137,12 +125,28 @@ contract Pacman is ReentrancyGuard, Ownable {
         maxScore = _maxScore;
 
         // Calculate reward amount from coinbox
-        uint256 amountToReward = gameToken.balanceOf(coinboxAddress) * rewardFee / 100;
+        uint256 amountToReward;
+        
+        if ( bonusDay ) {
+            amountToReward = gameToken.balanceOf(address(this)) * bonusFee / 100;
+        } else {
+            amountToReward = gameToken.balanceOf(address(this)) * rewardFee / 100;
+        }
 
         // Transfer reward amount to the user
-        gameToken.transferFrom(coinboxAddress, address(msg.sender), amountToReward);
+        gameToken.transfer(address(msg.sender), amountToReward);
 
         emit NewHighScore(msg.sender, amountToReward, _maxScore);
+    }
+
+    /**
+     * @notice Set bonus day
+     */
+    function setBonusDay(bool _bonusDay) 
+        external
+        onlyOwner
+    {
+        bonusDay = _bonusDay;
     }
 
     /**

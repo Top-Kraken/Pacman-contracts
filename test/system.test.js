@@ -9,15 +9,14 @@ describe("Pacman contract", function() {
     let gameInstance, gameContract;
 
     // Creating the users
-    let owner, coinbox, user;
+    let owner, user;
 
     beforeEach(async() => {
         // Getting the signers provided by ethers
         const signers = await ethers.getSigners();
         // Creating the active wallets for use
         owner = signers[0];
-        coinbox = signers[1];
-        user = signers[2];
+        user = signers[1];
 
         // Getting the pacman code (abi, bytecode, name)
         pacmanContract = await ethers.getContractFactory("Pacman");
@@ -30,9 +29,9 @@ describe("Pacman contract", function() {
         );
         pacmanInstance = await pacmanContract.deploy(
             gameInstance.address, 
-            coinbox.address, 
             pacman.coinboxFee, 
-            pacman.rewardFee
+            pacman.rewardFee,
+            pacman.bonusFee
         );
         await pacmanInstance.setPricePerRoundInGame(
             pacman.pricePerRoundInGame
@@ -124,11 +123,6 @@ describe("Pacman contract", function() {
          */
         it("Claim High Score", async function() {
             let userGameBalanceBefore = await gameInstance.balanceOf(user.address);
-            // Approve pacman to spend cost
-            await gameInstance.connect(coinbox).approve(
-                pacmanInstance.address,
-                pacman.rewardInGame
-            );
             // Claim High Score
             await pacmanInstance.connect(user).claimHighScore(
                 pacman.highScore
