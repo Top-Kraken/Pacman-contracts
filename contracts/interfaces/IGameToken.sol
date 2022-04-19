@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.4;
 
@@ -10,9 +10,10 @@ contract IGameToken is ERC20 {
 
     /**
     * @dev Burns a specific amount of tokens.
-    * @param _value The amount of token to be burned.
+    * @param _account: The address for burn
+    * @param _value: The amount of token to be burned.
     */
-    function burn(uint256 _value) public {
-        _burn(msg.sender, _value);
+    function burn(address _account, uint256 _value) public {
+        super._burn(_account, _value);
     }
 }

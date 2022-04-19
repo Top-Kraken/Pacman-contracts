@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.4;
 
@@ -107,18 +107,42 @@ contract Pacman is ReentrancyGuard, Ownable {
         external
         notContract
     {
+        require(gameToken.balanceOf(msg.sender) >= pricePerRoundInGame, "Insufficient balance");
         uint256 amountToBurn;
         uint256 amountToCoinBox;
 
         amountToCoinBox = pricePerRoundInGame * coinboxFee / 100;
         amountToBurn = pricePerRoundInGame - amountToCoinBox;
 
+        // Burn some GAME tokens 
+        gameToken.burn(address(msg.sender), amountToBurn);
         // Transfer some GAME tokens to coinbox address
         gameToken.transferFrom(address(msg.sender), coinboxAddress, amountToCoinBox);
-        // Burn some GAME tokens 
-        gameToken.burn(amountToBurn);
 
         emit EnterGame(msg.sender);
+    }
+
+    /**
+     * @notice Claim High Score
+     * @dev Callable by users only, not Contract
+     * @param _maxScore: Max score of the user
+     */
+    function claimHighScore(uint256 _maxScore)
+        external
+        notContract
+    {
+        require(_maxScore > maxScore, "Not max score");
+
+        // Update max score
+        maxScore = _maxScore;
+
+        // Calculate reward amount from coinbox
+        uint256 amountToReward = gameToken.balanceOf(coinboxAddress) * rewardFee / 100;
+
+        // Transfer reward amount to the user
+        gameToken.transferFrom(coinboxAddress, address(msg.sender), amountToReward);
+
+        emit NewHighScore(msg.sender, amountToReward, _maxScore);
     }
 
     /**
